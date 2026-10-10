@@ -1,98 +1,94 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { StyleSheet, TextInput } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { Button } from '@/components/button';
+import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { requestBreakdown } from '@/lib/api';
+import { addTasks } from '@/lib/tasks';
+import { FREE_BREAKDOWNS_PER_WEEK, recordBreakdown, useBreakdownsLeft } from '@/lib/usage';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
+export default function BrainDumpScreen() {
+  const theme = useTheme();
+  const breakdownsLeft = useBreakdownsLeft();
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleBreakdown() {
+    setLoading(true);
+    setError(null);
+    try {
+      const { tasks } = await requestBreakdown(text);
+      if (tasks.length === 0) {
+        throw new Error("Couldn't find a task in that. Try describing something you need to do.");
+      }
+      recordBreakdown();
+      const [first] = addTasks(tasks);
+      setText('');
+      router.push({ pathname: '/tasks/[id]', params: { id: first.id } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
+
+  return (
+    <Screen>
+      <ThemedText type="subtitle">Brain dump</ThemedText>
+      <ThemedText themeColor="textSecondary">
+        Type whatever&apos;s on your mind, messy is fine. We&apos;ll turn it into small steps you
+        can start right now.
       </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+      <TextInput
+        multiline
+        value={text}
+        onChangeText={setText}
+        editable={!loading}
+        maxLength={2000}
+        placeholder="e.g. need to do taxes, no idea where the forms are, also email Sam back about Friday…"
+        placeholderTextColor={theme.textSecondary}
+        accessibilityLabel="Brain dump"
+        style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+      />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
+      {error && (
+        <ThemedText type="small" style={{ color: theme.danger }}>
+          {error}
         </ThemedText>
+      )}
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+      <Button
+        title="Break it down"
+        onPress={handleBreakdown}
+        loading={loading}
+        disabled={!text.trim() || breakdownsLeft === 0}
+      />
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+        {breakdownsLeft > 0
+          ? `${breakdownsLeft} of ${FREE_BREAKDOWNS_PER_WEEK} free breakdowns left this week`
+          : "You've used this week's free breakdowns. They reset on Monday."}
+      </ThemedText>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+  input: {
+    minHeight: 180,
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    fontSize: 16,
+    lineHeight: 24,
+    textAlignVertical: 'top',
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
+  center: {
     textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
   },
 });
