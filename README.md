@@ -1,8 +1,16 @@
-# Welcome to your Expo app 👋
+# FocusFlow
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Turn a messy brain dump into small, doable steps. FocusFlow is an AI-assisted task breakdown app for people who struggle to get started — type what's on your mind, get a short checklist back, and tick it off one step at a time.
 
-## Get started
+> FocusFlow is a productivity tool. It is not a medical device and does not diagnose or treat any condition.
+
+## Stack
+
+- [Expo](https://expo.dev) SDK 57 + Expo Router (iOS, Android, web)
+- Expo Router API route (`src/app/api/breakdown+api.ts`) calls Claude Haiku 5.5 server-side, so the API key never ships in the app
+- On-device storage via `expo-sqlite`'s `localStorage` shim
+
+## Setup
 
 1. Install dependencies
 
@@ -10,47 +18,31 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Add your Anthropic API key to `.env.local` (git-ignored):
+
+   ```bash
+   ANTHROPIC_API_KEY=sk-ant-...
+   ```
+
+3. Start the dev server
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+   The API route is served by the dev server, so breakdowns work in development on device, simulator and web.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Deploying the API
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+The app's AI calls go to the Expo Router API route, which needs a server in production:
 
 ```bash
-npm run reset-project
+npx expo export --platform web
+npx eas-cli@latest deploy
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Set `ANTHROPIC_API_KEY` as a secret environment variable in EAS, then set the deployed URL as `origin` in the `expo-router` plugin in `app.json` so native builds know where to send requests.
 
-### Other setup steps
+## Free tier
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Free users get a limited number of AI breakdowns per week (`FREE_BREAKDOWNS_PER_WEEK` in `src/lib/usage.ts`). The cap is currently enforced on-device only; server-side enforcement arrives with accounts and the paywall.
